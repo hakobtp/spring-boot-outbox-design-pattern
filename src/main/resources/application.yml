@@ -1,0 +1,29 @@
+server:
+  port: 9089
+
+spring:
+  application:
+    name: Spring-Outbox-Design-Pattern
+  config:
+    import: classpath:kafka_info.yml
+  datasource:
+    url: jdbc:postgresql://localhost:5432/outbox
+    username: postgres
+    password: postgres
+  sql:
+    init:
+      platform: postgres
+  jpa:
+    show-sql: true
+    generate-ddl: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+  liquibase:
+    change-log: classpath:/db/changelog/db.changelog-master.xml
+
+logging:
+  level:
+    liquibase: INFO

@@ -1,0 +1,5 @@
+kafka:
+  topicInfos:
+    - configurationKey: order
+      topicName: order.events.v1
+      mapperName: orderOutboxPayloadMapper

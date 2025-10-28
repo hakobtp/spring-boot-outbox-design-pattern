@@ -6,6 +6,7 @@
 
     <changeSet id="create_tables" author="htp">
         <sqlFile path="table/1_outbox_events.sql" relativeToChangelogFile="true"/>
+        <sqlFile path="table/2_order.sql" relativeToChangelogFile="true"/>
     </changeSet>
 
 </databaseChangeLog>

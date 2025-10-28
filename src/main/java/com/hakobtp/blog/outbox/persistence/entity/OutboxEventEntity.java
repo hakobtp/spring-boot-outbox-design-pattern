@@ -1,5 +1,6 @@
 package com.hakobtp.blog.outbox.persistence.entity;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.hakobtp.blog.common.persistence.AbstractModificationInfoBaseEntity;
 import com.hakobtp.blog.outbox.enums.OutboxEventType;
 import com.hakobtp.blog.outbox.enums.OutboxStatus;
@@ -73,7 +74,7 @@ public class OutboxEventEntity extends AbstractModificationInfoBaseEntity {
      */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "payload", nullable = false, columnDefinition = "jsonb")
-    private Object payload;
+    private JsonNode payload;
 
     /**
      * The current processing status of the event (e.g., NEW, PROCESSING, COMPLETED, FAILED).

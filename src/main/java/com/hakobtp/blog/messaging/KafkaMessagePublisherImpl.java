@@ -7,9 +7,15 @@ import com.hakobtp.blog.outbox.enums.OutboxStatus;
 import com.hakobtp.blog.outbox.messaging.OutboxMessagePublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.header.internals.RecordHeader;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -26,35 +32,26 @@ class KafkaMessagePublisherImpl implements OutboxMessagePublisher {
     private final KafkaInfo kafkaInfo;
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
-    /**
-     * Asynchronously publishes a message to a Kafka topic.
-     * <p>
-     * The method sends the message and uses a {@code CompletableFuture} callback
-     * ({@code whenComplete}) to handle the result. It does not block. Upon completion,
-     * it invokes the provided callback function with either {@code OutboxStatus.COMPLETED}
-     * or {@code OutboxStatus.FAILED}, allowing the caller to update the event's status
-     * in a separate transaction.
-     *
-     * @param configurationKey A key used to look up the target Kafka topic name.
-     * @param eventId          The unique ID of the event, used for logging.
-     * @param aggregateId      The aggregate ID, used as the Kafka message key for partitioning.
-     * @param payload          The JSON payload of the event.
-     * @param callback         A {@link Consumer} function to be executed upon completion,
-     *                         accepting the final {@link OutboxStatus}.
-     */
+
     @Override
     public void publish(
             String configurationKey,
             UUID eventId,
             String aggregateId,
             JsonNode payload,
+            Map<String, String> customHeaders,
             Consumer<OutboxStatus> callback
     ) {
         var topic = kafkaInfo.findByConfigurationKey(configurationKey)
                 .map(KafkaTopicInfo::topicName)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown topic name: " + configurationKey));
 
-        kafkaTemplate.send(topic, aggregateId, payload)
+        ProducerRecord<String, Object> producerRecord = new ProducerRecord<>(topic, aggregateId, payload);
+
+        producerRecord.headers().add(createRecordHeader("eventId", eventId.toString()));
+        createRecordHeader(customHeaders).forEach(c -> producerRecord.headers().add(c));
+
+        kafkaTemplate.send(producerRecord)
                 .whenComplete((result, ex) -> {
                     if (ex != null) {
                         log.error("Kafka send failed for event {}", eventId, ex);
@@ -64,4 +61,16 @@ class KafkaMessagePublisherImpl implements OutboxMessagePublisher {
                     }
                 });
     }
+
+    private List<RecordHeader> createRecordHeader(Map<String, String> headerMap) {
+        return Objects.requireNonNullElseGet(headerMap, Map::<String, String>of).entrySet().stream()
+                .map(entry -> createRecordHeader(entry.getKey(), entry.getValue()))
+                .toList();
+    }
+
+    private RecordHeader createRecordHeader(String key, String value) {
+        byte[] valueBytes = value.getBytes(StandardCharsets.UTF_8);
+        return new RecordHeader(key, valueBytes);
+    }
 }
+

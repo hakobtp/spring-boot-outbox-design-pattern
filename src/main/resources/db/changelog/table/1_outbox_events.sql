@@ -16,7 +16,7 @@ CREATE TABLE outbox_events
     created_by        VARCHAR(64)              NOT NULL DEFAULT 'system',
     modified_at       TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     modified_by       VARCHAR(64)              NOT NULL DEFAULT 'system',
-    processed_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NULL
+    processed_at      TIMESTAMP WITH TIME ZONE          DEFAULT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_outbox_status ON outbox_events (status);

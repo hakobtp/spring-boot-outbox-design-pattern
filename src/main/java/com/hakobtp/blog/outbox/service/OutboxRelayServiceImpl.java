@@ -106,13 +106,15 @@ class OutboxRelayServiceImpl implements OutboxRelayService {
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void updateEventStatusWithRetry(Long eventId, OutboxStatus status) {
-        outboxRepository.findById(eventId).ifPresent(event -> {
-            event.setStatus(status);
-            if (status == COMPLETED) {
-                event.setProcessedAt(OffsetDateTime.now());
-            }
-            log.info("Outbox event {} updated to {}", eventId, status);
-        });
+        outboxRepository.findById(eventId)
+                .map(event -> {
+                    event.setStatus(status);
+                    if (status == COMPLETED) {
+                        event.setProcessedAt(OffsetDateTime.now());
+                    }
+                    log.info("Outbox event {} updated to {}", eventId, status);
+                    return event;
+                }).ifPresent(outboxRepository::save);
     }
 
     /**

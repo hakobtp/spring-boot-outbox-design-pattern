@@ -55,7 +55,7 @@ public interface OutboxRepository extends JpaRepository<OutboxEventEntity, Long>
     @Query("""
             UPDATE OutboxEventEntity event
             SET event.status = 'FAILED'
-            WHERE event.status = 'PROCESSING' AND  event.modifiedAt< :stuckTime
+            WHERE event.status = 'PROCESSING' AND  event.modifiedAt < :stuckTime
             """)
     int resetStuckEvents(@Param("stuckTime") OffsetDateTime stuckTime);
 }

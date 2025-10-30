@@ -16,8 +16,6 @@ import com.hakobtp.blog.outbox.persistence.entity.OutboxEventEntity;
 import com.hakobtp.blog.outbox.persistence.repository.OutboxRepository;
 import jakarta.validation.constraints.NotNull;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,12 +52,6 @@ class OutboxServiceImpl implements OutboxService {
         this.objectMapper = objectMapper;
         this.outboxRepository = outboxRepository;
         this.outboxPayloadMapperMap = buildOutboxPayloadMapperMap(outboxPayloadMappers);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Page<OutboxEventEntity> findAllByEventType(OutboxEventType eventType, Pageable pageable) {
-        return outboxRepository.findAllByEventType(eventType, pageable);
     }
 
     @Override

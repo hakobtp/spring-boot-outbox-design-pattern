@@ -4,7 +4,9 @@ import com.hakobtp.blog.common.config.kafka.KafkaInfo;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
+@EnableScheduling
 @SpringBootApplication
 @EnableConfigurationProperties(KafkaInfo.class)
 public class OrderApplicationMain {

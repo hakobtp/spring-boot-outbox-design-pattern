@@ -12,6 +12,7 @@ import lombok.experimental.Accessors;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.UUID;
 
@@ -105,6 +106,9 @@ public class OutboxEventEntity extends AbstractModificationInfoBaseEntity {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "custom_headers", columnDefinition = "jsonb")
     private Map<String, String> customHeaders;
+
+    @Column(nullable = true, columnDefinition = "TIMESTAMP WITH TIME ZONE")
+    private OffsetDateTime processedAt;
 
     /**
      * JPA lifecycle callback method that runs before the entity is first persisted.

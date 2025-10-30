@@ -1,5 +1,5 @@
 server:
-  port: 9089
+  port: ${SERVER_PORT:9089}
 
 spring:
   application:
@@ -7,9 +7,9 @@ spring:
   config:
     import: classpath:kafka_info.yml
   datasource:
-    url: jdbc:postgresql://localhost:5432/outbox
-    username: postgres
-    password: postgres
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/outbox}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
   sql:
     init:
       platform: postgres
@@ -23,7 +23,16 @@ spring:
         format_sql: true
   liquibase:
     change-log: classpath:/db/changelog/db.changelog-master.xml
-
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+      properties:
+        delivery.timeout.ms: 120000
+        retry.backoff.ms: 1000
 logging:
   level:
     liquibase: INFO

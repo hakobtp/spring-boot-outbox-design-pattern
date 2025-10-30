@@ -7,16 +7,12 @@ import com.hakobtp.blog.outbox.model.OutboxEvent;
 import com.hakobtp.blog.outbox.model.OutboxPayloadCapable;
 import com.hakobtp.blog.outbox.persistence.entity.OutboxEventEntity;
 import jakarta.validation.constraints.NotNull;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 
 import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
 
 public interface OutboxService {
-
-    Page<OutboxEventEntity> findAllByEventType(OutboxEventType eventType, Pageable pageable);
 
     <T extends AbstractModificationInfoBaseEntity> OutboxEventEntity save(
             @NotNull OutboxPayloadCapable<? extends Serializable> payload,

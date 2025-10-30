@@ -1,0 +1,12 @@
+# src/test/resources/application-test.yml
+spring:
+  kafka:
+    consumer:
+      group-id: test-consumer-group
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      # Required for the JsonDeserializer to work with JsonNode
+      properties:
+        spring.json.trusted.packages: "*"
+      # Ensure the consumer starts from the beginning of the topic for each test run
+      auto-offset-reset: earliest

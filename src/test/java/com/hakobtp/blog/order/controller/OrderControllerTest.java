@@ -1,13 +1,18 @@
 package com.hakobtp.blog.order.controller;
 
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.hakobtp.blog.common.BaseIT;
+import com.hakobtp.blog.common.TestKafkaConsumer;
 import com.hakobtp.blog.order.controller.request.CreateOrUpdateOrderRequest;
 import com.hakobtp.blog.order.controller.response.OrderResponse;
+import com.hakobtp.blog.order.persistence.entity.OrderEntity;
 import com.hakobtp.blog.outbox.enums.OutboxEventType;
 import com.hakobtp.blog.outbox.enums.OutboxStatus;
 import com.hakobtp.blog.outbox.persistence.repository.OutboxRepository;
+import com.hakobtp.blog.outbox.service.OutboxRelayService;
 import lombok.SneakyThrows;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +22,7 @@ import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.context.jdbc.SqlConfig;
 
 import java.math.BigDecimal;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.springframework.test.context.jdbc.Sql.ExecutionPhase.AFTER_TEST_METHOD;
@@ -32,21 +38,34 @@ class OrderControllerTest extends BaseIT {
     private static final String CLEAN_SCRIPT = "/scripts/order/order_clean_script.sql";
 
     @Autowired
-    private OutboxRepository outboxService;
+    private OutboxRepository outboxRepository;
+    @Autowired
+    private TestKafkaConsumer testKafkaConsumer;
+    @Autowired
+    private OutboxRelayService outboxRelayService;
+
+    @BeforeEach
+    void setUp() {
+        testKafkaConsumer.resetLatch();
+    }
 
     @Test
     @SneakyThrows
-    @DisplayName("POST: " + ORDERS_ENDPOINT + " → Create new order successfully and verify outbox event")
+    @DisplayName("POST: " + ORDERS_ENDPOINT + "Create order, trigger relay, and verify Kafka message publication")
     @Sql(scripts = CLEAN_SCRIPT, executionPhase = AFTER_TEST_METHOD, config = @SqlConfig(transactionMode = ISOLATED))
     void createOrder_success() {
-        // Arrange
+        //region Arrange
+
         CreateOrUpdateOrderRequest request = new CreateOrUpdateOrderRequest(
                 "ORD-" + System.currentTimeMillis(),
                 "John Doe",
                 BigDecimal.valueOf(150.50)
         );
 
-        // Act: create order
+        //endregion
+
+        //region Act: create order
+
         String responseContent = mockMvc.perform(post(ORDERS_ENDPOINT)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
@@ -55,14 +74,18 @@ class OrderControllerTest extends BaseIT {
                 .getResponse()
                 .getContentAsString();
 
-        // Deserialize response
-        var orderResponse = jsonStringToObject(responseContent, OrderResponse.class);
+        //endregion
 
-        // Assert order is created
+        // region  Deserialize response
+
+        var orderResponse = jsonStringToObject(responseContent, OrderResponse.class);
         assertThat(orderResponse).isNotNull();
         assertThat(orderResponse.id()).isNotNull();
 
-        // Act & Assert: get order by ID
+        //endregion
+
+        // region  Act & Assert: get order by ID
+
         mockMvc.perform(get(ORDERS_ENDPOINT + "/" + orderResponse.id())
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
@@ -72,8 +95,11 @@ class OrderControllerTest extends BaseIT {
                 .andExpect(jsonPath("$.amount").value(request.amount().doubleValue()))
                 .andExpect(jsonPath("$.orderDate").isNotEmpty());
 
-        // Assert Outbox event
-        var outboxEvents = outboxService.findAllByEventType(OutboxEventType.INSERT, Pageable.unpaged()).getContent();
+        //endregion
+
+        //region  Assert Outbox event
+
+        var outboxEvents = outboxRepository.findAllByEventType(OutboxEventType.INSERT, Pageable.unpaged()).getContent();
         assertThat(outboxEvents.size()).isEqualTo(1);
 
         var outboxEvent = outboxEvents.get(0);
@@ -99,5 +125,28 @@ class OrderControllerTest extends BaseIT {
         assertThat(outboxEvent.getPayload().get("modifiedBy").textValue()).isEqualTo("system");
         assertThat(outboxEvent.getPayload().get("orderNumber").textValue()).isEqualTo(orderResponse.orderNumber());
         assertThat(outboxEvent.getPayload().get("customerName").textValue()).isEqualTo(request.customerName());
+
+        //endregion
+
+        // Act: Manually trigger the outbox relay to publish the message
+        outboxRelayService.relayBatch();
+
+        // Wait for the asynchronous Kafka consumer to receive the message
+        boolean messageReceived = testKafkaConsumer.getLatch().await(10, TimeUnit.SECONDS);
+        assertThat(messageReceived).isTrue(); // Fails if the consumer times out
+
+        // Assert: Verify the content of the published Kafka message
+        JsonNode kafkaPayload = testKafkaConsumer.getPayload();
+        assertThat(kafkaPayload).isNotNull();
+        var payload = jsonNodeToObject(kafkaPayload, OrderEntity.class);
+
+        assertThat(payload.getOrderNumber()).isEqualTo(request.orderNumber());
+        assertThat(payload.getCustomerName()).isEqualTo(request.customerName());
+        assertThat(payload.getAmount()).isEqualByComparingTo(request.amount());
+        assertThat(payload.getAggregateId()).isEqualTo(outboxEvent.getAggregateId());
+
+        // Assert: Verify the outbox event in the DB was updated to 'COMPLETED'
+        var completedEvent = outboxRepository.findById(outboxEvent.getId()).orElseThrow();
+        assertThat(completedEvent.getStatus()).isEqualTo(OutboxStatus.COMPLETED);
     }
 }
